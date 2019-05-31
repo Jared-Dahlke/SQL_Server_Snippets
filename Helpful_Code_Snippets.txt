@@ -1,0 +1,61 @@
+--this doc is a compilation of helpful code snippets. I use many of these every day:
+
+
+--Get Definition of a stored procedure by name:
+
+SELECT definition  
+FROM sys.sql_modules  
+WHERE object_id = (OBJECT_ID(N'GetDQMData'));  
+
+
+--Get definition of a view by name:
+
+select definition
+from sys.objects     o
+join sys.sql_modules m on m.object_id = o.object_id
+where o.object_id = object_id( 'dbo.MyView')
+  and o.type      = 'V'
+
+
+-- Get definition of a trigger by name:
+
+
+select so.name, text
+from sysobjects so, syscomments sc
+where type = 'TR'
+and so.id = sc.id
+and text like '%ictransfer%'
+
+
+
+
+--Get all tables that have a particular column name:
+
+   SELECT      c.name  AS 'ColumnName'
+            ,t.name AS 'TableName'
+FROM        sys.columns c
+JOIN        sys.tables  t   ON c.object_id = t.object_id
+WHERE       c.name LIKE '%suggested%'
+ORDER BY    TableName
+            ,ColumnName;
+
+
+
+
+--Update from a select statement:
+
+UPDATE
+    Table_A
+SET
+    Table_A.col1 = Table_B.col1,
+    Table_A.col2 = Table_B.col2
+FROM
+    Some_Table AS Table_A
+    INNER JOIN Other_Table AS Table_B
+        ON Table_A.id = Table_B.id
+WHERE
+    Table_A.col3 = 'cool'
+
+
+
+
