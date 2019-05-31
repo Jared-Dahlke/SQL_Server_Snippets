@@ -1,0 +1,247 @@
+CREATE PROCEDURE GetDQMData @DQMID VARCHAR(55)
+AS
+SELECT DISTINCT cust.CustomerName
+	,dqm.ConfigQuoteID AS 'ConfigQuoteID'
+	,dqm.ConfigQuoteName
+	,pg.Description AS 'PriceGroup'
+	,dqm.SalesRepID
+	,dqm.TermInMonths
+	,dqm.LeaseIncludeBuyout
+	,dqm.LeaseWrapBuyout
+	,dqm.LeaseBuyoutAmount
+	,dqm.LeaseFactor
+	,dqm.TotalSuggestedPrice
+	,CASE 
+		WHEN mps.grandtotalcost IS NULL
+			THEN '0.00'
+		ELSE mps.grandtotalcost
+		END AS 'MPSServicePT'
+	,a.PrefFullName AS 'SalesRep'
+	,a.Email
+	,dqm.leasePayment AS 'DQMEquipPayment'
+	,dqm.TotalService AS 'DQMTotalService'
+	,dqm.TotalOutcostCalculated
+	,sum(sd.Volume) AS 'TotalVolume'
+	,sum(CASE 
+			WHEN dqmd.item LIKE '%solutions%'
+				THEN 1
+			ELSE 0
+			END) AS 'SolutionsItemCount'
+	,sum(CASE 
+			WHEN dqmd.item NOT LIKE '%solutions%'
+				THEN 1
+			ELSE 0
+			END) AS 'NonSolutionsItemCount'
+	,dqm.ServiceBaseCost AS 'DQMServiceBaseCost'
+	,sum(CASE 
+			WHEN configs.Description LIKE '%unlimited%'
+				THEN 1
+			ELSE 0
+			END) AS 'UnlimitedItemCount'
+	,sum(CASE 
+			WHEN configs.Description NOT LIKE '%unlimited%'
+				THEN 1
+			ELSE 0
+			END) AS 'NotUnlimitedItemCount'
+	,cms.DQMID AS 'SessionDQMID'
+	,cms.TotalCustomerPayment AS 'SessionTotalCustomerPayment'
+	,cms.MPSServicePayment AS 'SessionMPSServicePayment'
+	,cms.CopierServicePayment AS 'SessionCopierServicePayment'
+	,cms.LeaseFactor AS 'SessionLeaseFactor'
+	,cms.BlackOverageSalePrice AS 'SessionBlackOverageSalePrice'
+	,cms.ColorOverageSalePrice AS 'SessionColorOverageSalePrice'
+	,cms.OutrightChecked AS 'SessionOutrightChecked'
+	,cms.TradeChecked AS 'SessionTradeChecked'
+	,cms.NetNewChecked AS 'SessionNetNewChecked'
+	,cms.NetNewForLifeChecked AS 'SessionNetNewForLifeChecked'
+	,cms.MPSMITChecked AS 'SessionMPSMITChecked'
+	,cms.BidSupportChecked AS 'SessionBidSupportChecked'
+	,cms.K12Checked AS 'SessionK12Checked'
+	,cms.SubmittedToOrders AS 'SessionSubmittedToOrders'
+	,cms.Commercial3GChecked AS 'SessionCommercial3GChecked'
+	,cms.Commercial4GChecked AS 'SessionCommercial4GChecked'
+	,cms.SalesRepName AS 'SessionSalesRepName'
+	,cms.AgentID AS 'SessionAgentID'
+	,cms.SalePrice AS 'SessionSalePrice'
+	,cms.MiscRevenueAdjustment AS 'SessionMiscRevenueAdjustment'
+	,cms.OrderProcessorApprovalStatus AS 'SessionOrderProcessorApprovalStatus'
+	,cms.LeaseTerm AS 'SessionLeaseTerm'
+	,cms.NoServiceEscalation AS 'SessionNoServiceEscalation'
+	,cms.MatrixLeaseBuyout AS 'SessionMatrixLeaseBuyout'
+	,cms.ExistingContractNumber AS 'SessionExistingContractNumber'
+	,cms.ExistingContractCustomerName AS 'SessionExistingContractCustomerName'
+	,ss.BlackVolumeSum
+	,ss.ColorVolumeSum
+	,ss.BlackServiceRateSum
+	,ss.ColorServiceRateSum
+	,ss.BlackOverageRateSum
+	,ss.ColorOverageRateSum
+	,ss.BlackVolumexOverageRate
+	,ss.ColorVolumexOverageRate
+	,ss.BlackServiceBaseCostSum
+	,ss.ColorServiceBaseCostSum
+	,ss.BlackTargetCustomerVolumeSum
+	,ss.ColorTargetCustomerVolumeSum
+	,ss.MPSBlackBlendedRate
+	,ss.MPSColorBlendedRate
+	,ss.MPSBlackVolume
+	,ss.MPSColorVolume
+	,ss.BlackCount
+	,ss.ColorCount
+	,ai.AddedTransferPriceSum
+	,ai.AddedPriceSum
+	,ai.AddedVolume
+	,ai.AddedBaseCost
+	,ai.AddedBlackRate
+	,ai.AddedColorRate
+	,ai.AddedBlackCount
+	,ai.AddedColorCount
+	,ai.AddedBlackRatexVolume
+	,ai.AddedColorRatexVolume
+	,ai.AddedBlackVolume
+	,ai.AddedColorVolume
+	,promo.PromoCashPayout
+	,promo.PromoTransferReduction
+	,Deductions.DeductionsAmount
+	,CASE 
+		WHEN paid.DQMID IS NOT NULL
+			THEN 'Paid'
+		ELSE 'NotPaid'
+		END AS CommPaidStatus
+FROM coMRC.dbo.saConfigQuotes dqm
+LEFT JOIN DIGITAL_HUB.dbo.DD_Mpssessions mps ON dqm.ConfigQuoteID = mps.dqmnumber
+LEFT JOIN saConfigQuoteDetails dqmd ON dqm.configQuoteID = dqmd.configQuoteID
+LEFT JOIN icConfigs configs ON dqmd.ConfigID = configs.ConfigID
+LEFT JOIN (
+	SELECT DISTINCT dqmid
+	FROM DIGITAL_HUB.dbo.dahlke_CompMatrixDeals cmd
+	RIGHT JOIN digital_hub.dbo.CommissionsProperties cp ON cmd.id = cp.ID
+	) paid ON CONVERT(VARCHAR(255), dqm.ConfigQuoteID) = paid.DQMID
+LEFT JOIN SAConfigServiceDetails sd ON dqmd.ConfigQuoteDetailID = sd.ConfigQuoteDetailID
+LEFT JOIN shAgents a ON dqm.SalesRepID = a.AgentID
+LEFT JOIN arCustomers cust ON dqm.CustomerID = cust.CustomerID
+LEFT JOIN SAPriceGroups pg ON dqm.PriceGroupID = pg.PriceGroupID
+LEFT JOIN digital_hub.dbo.CompMatrixSessions cms ON dqm.configQuoteID = cms.DQMID
+LEFT JOIN DQMDataServiceSummary ss ON dqm.configquoteID = ss.configQuoteID
+LEFT JOIN (
+	SELECT i.DQMID
+		,sum(i.AppliedCashPayout) AS 'PromoCashPayout'
+		,sum(i.AppliedTransferReduction) AS 'PromoTransferReduction'
+	FROM digital_hub.dbo.CompMatrixPromoItems i
+	WHERE DQMID = @DQMID
+		AND ItemEnabled = 1
+	GROUP BY i.DQMID
+	) promo ON dqm.ConfigQuoteID = promo.DQMID
+LEFT JOIN (
+	SELECT dqmid
+		,sum(convert(DECIMAL(18, 2), TransferPrice)) AS 'AddedTransferPriceSum'
+		,sum(convert(DECIMAL(18, 2), HotListPrice)) AS 'AddedPriceSum'
+		,sum(convert(DECIMAL(18, 2), Volume)) AS 'AddedVolume'
+		,sum(convert(DECIMAL(18, 2), BlackVolume)) AS 'AddedBlackVolume'
+		,sum(convert(DECIMAL(18, 2), ColorVolume)) AS 'AddedColorVolume'
+		,sum(convert(DECIMAL(18, 2), BaseCost)) AS 'AddedBaseCost'
+		,sum(convert(DECIMAL(18, 4), BlackRate)) AS 'AddedBlackRate'
+		,sum(convert(DECIMAL(18, 4), BlackRate) * convert(DECIMAL(18, 2), BlackVolume)) AS 'AddedBlackRatexVolume'
+		,sum(convert(DECIMAL(18, 4), ColorRate) * convert(DECIMAL(18, 2), ColorVolume)) AS 'AddedColorRatexVolume'
+		,sum(convert(DECIMAL(18, 4), ColorRate)) AS 'AddedColorRate'
+		,sum(CASE 
+				WHEN convert(DECIMAL(18, 4), BlackRate) = 0
+					THEN 0
+				ELSE 1
+				END) AS 'AddedBlackCount'
+		,sum(CASE 
+				WHEN convert(DECIMAL(18, 4), ColorRate) = 0
+					THEN 0
+				ELSE 1
+				END) AS 'AddedColorCount'
+	FROM digital_hub.dbo.CompMatrixSessionsAddedItems
+	WHERE dqmid = @DQMID
+	GROUP BY dqmid
+	) ai ON dqm.ConfigQuoteID = ai.DQMID
+LEFT JOIN (
+	SELECT DQMID
+		,sum(Amount) AS 'DeductionsAmount'
+	FROM DIGITAL_HUB.dbo.CompMatrixDeductions
+	WHERE DQMID = @DQMID
+	GROUP BY DQMID
+	) Deductions ON dqm.ConfigQuoteID = Deductions.DQMID
+WHERE dqm.ConfigQuoteID = @DQMID
+GROUP BY cust.CustomerName
+	,dqm.ConfigQuoteID
+	,dqm.ConfigQuoteName
+	,dqm.LeaseIncludeBuyout
+	,dqm.LeaseWrapBuyout
+	,pg.Description
+	,dqm.SalesRepID
+	,dqm.termInMonths
+	,dqm.LeaseBuyoutAmount
+	,dqm.LeaseFactor
+	,dqm.TotalSuggestedPrice
+	,a.PrefFullName
+	,a.Email
+	,dqm.LeasePayment
+	,dqm.TotalService
+	,dqm.TotalOutcostCalculated
+	,mps.grandtotalcost
+	,dqm.ServiceBaseCost
+	,cms.TotalCustomerPayment
+	,cms.MPSServicePayment
+	,cms.CopierServicePayment
+	,cms.LeaseFactor
+	,cms.BlackOverageSalePrice
+	,cms.ColorOverageSalePrice
+	,cms.OutrightChecked
+	,cms.TradeChecked
+	,cms.NetNewChecked
+	,cms.NetNewForLifeChecked
+	,cms.MPSMITChecked
+	,cms.BidSupportChecked
+	,cms.K12Checked
+	,cms.SubmittedToOrders
+	,cms.Commercial3GChecked
+	,cms.Commercial4GChecked
+	,cms.DQMID
+	,cms.SalesRepName
+	,cms.AgentID
+	,cms.SalePrice
+	,cms.MiscRevenueAdjustment
+	,cms.OrderProcessorApprovalStatus
+	,cms.LeaseTerm
+	,cms.NoServiceEscalation
+	,cms.MatrixLeaseBuyout
+	,cms.ExistingContractNumber
+	,cms.ExistingContractCustomerName
+	,ss.BlackVolumeSum
+	,ss.ColorVolumeSum
+	,ss.BlackServiceRateSum
+	,ss.ColorServiceRateSum
+	,ss.BlackOverageRateSum
+	,ss.ColorOverageRateSum
+	,ss.BlackVolumexOverageRate
+	,ss.ColorVolumexOverageRate
+	,ss.BlackServiceBaseCostSum
+	,ss.ColorServiceBaseCostSum
+	,ss.BlackTargetCustomerVolumeSum
+	,ss.ColorTargetCustomerVolumeSum
+	,ss.MPSBlackBlendedRate
+	,ss.MPSColorBlendedRate
+	,ss.MPSBlackVolume
+	,ss.MPSColorVolume
+	,ss.BlackCount
+	,ss.ColorCount
+	,ai.AddedTransferPriceSum
+	,ai.AddedPriceSum
+	,ai.AddedVolume
+	,ai.AddedBaseCost
+	,ai.AddedBlackRate
+	,ai.AddedColorRate
+	,ai.AddedBlackCount
+	,ai.AddedColorCount
+	,ai.AddedBlackRatexVolume
+	,ai.AddedColorRatexVolume
+	,ai.AddedBlackVolume
+	,ai.AddedColorVolume
+	,promo.PromoCashPayout
+	,promo.PromoTransferReduction
+	,Deductions.DeductionsAmount
+	,paid.DQMID
