@@ -1,4 +1,4 @@
---this doc is a compilation of helpful code snippets. I use many of these every day:
+--this doc is a compilation of helpful SQL code snippets I've accumulated over the past couple of years. I use many of these every day:
 
 
 --Get Definition of a stored procedure by name:
