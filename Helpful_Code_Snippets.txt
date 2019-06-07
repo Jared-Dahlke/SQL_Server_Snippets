@@ -95,3 +95,27 @@ BEGIN
   update sometable set   colA = @Path, colB = @FileName where ID = @DQMID
 
 END
+
+
+--send html email:
+
+
+DECLARE @myBody VARCHAR(max)
+
+	SELECT @myBody = '<div style="font-size: 20px;">'+@repName+',<br>Please note that order processor '+@opName+' (' + @Value + ') has been assigned to your comp matrix ' + @DQMID + ' for customer ' + @customerName + '. <br>  <br>' + @tbody + 'You can view the matrix anytime by visiting this URL: myWebsite.com?DQMID=' + @DQMID + ' <br>  You can view the matrix status info anytime by visiting this URL: myWebsite.com  <br>  <br>  Thank you. <br> <br>  -Business Intelligence Team </div>'
+
+	DECLARE @mySubject VARCHAR(max)
+
+	SELECT @mySubject = 'Comp Matrix Update: ' + @DQMID + ' | ' + @customerName
+
+	Declare @ccr varchar(2000)
+	Select @ccr = @Value+'; '+ @managerEmail + '; someEmail@mrc360.com; anotherEmail@mrc360.com; thirdEmail@mrc360.com' 
+
+	EXEC msdb.dbo.sp_send_dbmail @recipients = @repEmail
+		,@copy_recipients = @ccr
+		,@blind_copy_recipients = 'yetAnotherEmail@mrc360.com'
+		,@subject = @mySubject
+		,@body = @myBody
+		,@body_format = 'HTML'
+
+
