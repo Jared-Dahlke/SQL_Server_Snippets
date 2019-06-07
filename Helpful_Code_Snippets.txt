@@ -58,4 +58,40 @@ WHERE
 
 
 
+--declare and set 3 variables:
 
+Declare @DQMID varchar(55)
+Declare @Path varchar(2000)
+Declare @FileName varchar(2000)
+
+select 
+@DQMID = DQMID, 
+@Path = Path, 
+@FileName = FileName
+From (
+select DQMID, Path, FileName from myTableName
+) x
+
+
+
+--create a trigger that fires when a record gets inserted into a table, and pull info from the inserted record so we can work with it:
+
+create trigger t_SendDocUploadNotif on CompMatrixDocuments
+After Insert as
+BEGIN
+
+  Declare @DQMID varchar(55)
+  Declare @Path varchar(2000)
+  Declare @FileName varchar(2000)
+
+  select 
+  @DQMID = DQMID, 
+  @Path = Path, 
+  @FileName = FileName
+  From (
+  select DQMID, Path, FileName from inserted
+  ) x
+
+  update sometable set   colA = @Path, colB = @FileName where ID = @DQMID
+
+END
